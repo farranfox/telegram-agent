@@ -1,0 +1,12 @@
+services:
+    sandbox-runner:
+        build: .
+        read_only: true
+        user: "10001:10001"
+        working_dir: /workspace
+        cap_drop: [ALL]
+        security_opt: [no-new-privileges:true]
+        pids_limit: 64
+        mem_limit: 128m
+        cpus: 0.5
+        tmpfs: [/tmp:size=16M, mode=1777]
