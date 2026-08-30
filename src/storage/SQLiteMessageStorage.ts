@@ -39,8 +39,9 @@ export class SQLiteMessageStorage implements MessageStorage {
         this.database.transaction(() => {
             const turnId = this.nextTurn(dialogId);
             this.insert(dialogId, turnId, "assistant", content, JSON.stringify(calls), null);
-            for (const result of results)
+            for (const result of results) {
                 this.insert(dialogId, turnId, "tool", result.content, null, result.toolCallId);
+            }
         });
     }
 
@@ -69,7 +70,9 @@ export class SQLiteMessageStorage implements MessageStorage {
     }
 
     private toMessage(row: MessageRow): AgentMessage {
-        if (row.role === "tool") return { role: "tool", content: row.content, toolCallId: row.tool_call_id ?? "" };
+        if (row.role === "tool") {
+            return { role: "tool", content: row.content, toolCallId: row.tool_call_id ?? "" };
+        }
         if (row.role === "assistant") {
             const toolCalls = row.tool_calls_json ? (JSON.parse(row.tool_calls_json) as ToolCall[]) : undefined;
             return { role: "assistant", content: row.content, ...(toolCalls ? { toolCalls } : {}) };

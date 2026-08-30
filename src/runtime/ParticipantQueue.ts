@@ -9,7 +9,9 @@ export class ParticipantQueue {
             next.catch(() => undefined),
         );
         void next.finally(() => {
-            if (this.tails.get(participantId) === next) this.tails.delete(participantId);
+            if (this.tails.get(participantId) === next) {
+                this.tails.delete(participantId);
+            }
         });
         return next;
     }

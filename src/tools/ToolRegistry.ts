@@ -6,7 +6,9 @@ export class ToolRegistry implements ToolRunner {
     private readonly tools = new Map<string, Tool>();
 
     public constructor(tools: Tool[]) {
-        for (const tool of tools) this.tools.set(tool.spec.name, tool);
+        for (const tool of tools) {
+            this.tools.set(tool.spec.name, tool);
+        }
     }
 
     public specs(): ToolSpec[] {
@@ -15,7 +17,9 @@ export class ToolRegistry implements ToolRunner {
 
     public async run(runId: string, call: ToolCall, signal: AbortSignal): Promise<ToolResult> {
         const tool = this.tools.get(call.name);
-        if (!tool) return { ok: false, error: { code: "unknown_tool", message: `Unknown tool: ${call.name}` } };
+        if (!tool) {
+            return { ok: false, error: { code: "unknown_tool", message: `Unknown tool: ${call.name}` } };
+        }
         try {
             const input = parseArguments(call.arguments);
             return await tool.execute(runId, input, signal);
@@ -37,7 +41,8 @@ export class ToolRegistry implements ToolRunner {
 
 function parseArguments(argumentsJson: string): Record<string, unknown> {
     const parsed: unknown = JSON.parse(argumentsJson || "{}");
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
         throw new Error("Tool arguments must be a JSON object");
+    }
     return parsed as Record<string, unknown>;
 }

@@ -10,17 +10,24 @@ export class TelegramMessageHandler {
             return;
         }
         const participantId = `tg:${message.chatId}:${message.userId}`;
-        if (command(message.text, "start")) return void (await reply("Здравствуйте! Чем могу помочь?"));
-        if (command(message.text, "stop"))
+        if (command(message.text, "start")) {
+            return void (await reply("Здравствуйте! Чем могу помочь?"));
+        }
+        if (command(message.text, "stop")) {
             return void (await reply(this.runs.stop(participantId) ? "Останавливаю задачу." : "Активной задачи нет."));
+        }
         if (command(message.text, "new")) {
             await this.runs.startNewDialog(participantId);
             await reply("Начали новый диалог.");
             return;
         }
         const result = await this.runs.run(participantId, message.text);
-        if (result.type === "busy") return void (await reply("Агент сейчас занят, попробуйте после ответа."));
-        if (result.type === "success") await reply(result.response);
+        if (result.type === "busy") {
+            return void (await reply("Агент сейчас занят, попробуйте после ответа."));
+        }
+        if (result.type === "success") {
+            await reply(result.response);
+        }
     }
 }
 

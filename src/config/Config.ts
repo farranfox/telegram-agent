@@ -8,7 +8,9 @@ export type Config = {
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config {
     const required = (name: string): string => {
         const value = environment[name]?.trim();
-        if (!value) throw new Error(`Missing required environment variable: ${name}`);
+        if (!value) {
+            throw new Error(`Missing required environment variable: ${name}`);
+        }
         return value;
     };
     return {

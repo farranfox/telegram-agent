@@ -17,7 +17,9 @@ describe("Agent", () => {
             }),
             appendToolTurn: vi.fn(async (_dialogId, content, calls, results) => {
                 messages.push({ role: "assistant", content, toolCalls: calls });
-                for (const result of results) messages.push({ role: "tool", ...result });
+                for (const result of results) {
+                    messages.push({ role: "tool", ...result });
+                }
             }),
             appendUser: vi.fn(async (_dialogId, content) => {
                 messages.push({ role: "user", content });

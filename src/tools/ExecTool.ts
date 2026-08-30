@@ -17,10 +17,12 @@ export class ExecTool implements Tool {
 
     public async execute(runId: string, input: Record<string, unknown>, signal: AbortSignal): Promise<ToolResult> {
         const command = typeof input.command === "string" ? input.command : "";
-        if (!command.trim())
+        if (!command.trim()) {
             return { ok: false, error: { code: "invalid_command", message: "Command must not be empty" } };
-        if (command.length > 8192)
+        }
+        if (command.length > 8192) {
             return { ok: false, error: { code: "command_too_long", message: "Command exceeds 8192 characters" } };
+        }
         try {
             const result = await this.executor.execute(runId, command, signal);
             const output = JSON.stringify({

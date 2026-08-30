@@ -54,9 +54,13 @@ export async function main(): Promise<void> {
     const bot = new Telegraf(config.telegramBotToken);
     bot.on(message("text"), async (context) => {
         const incoming = toTelegramMessage(context);
-        if (incoming) await handler.handle(incoming, async (text) => await context.reply(text));
+        if (incoming) {
+            await handler.handle(incoming, async (text) => await context.reply(text));
+        }
     });
     await bot.launch();
 }
 
-if (process.argv[1]?.endsWith("main.ts") || process.argv[1]?.endsWith("main.js")) void main();
+if (process.argv[1]?.endsWith("main.ts") || process.argv[1]?.endsWith("main.js")) {
+    void main();
+}

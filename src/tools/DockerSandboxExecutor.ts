@@ -34,7 +34,9 @@ export class DockerSandboxExecutor implements SandboxExecutor {
 
     public async disposeRun(runId: string): Promise<void> {
         const volume = this.volumes.get(runId);
-        if (!volume) return;
+        if (!volume) {
+            return;
+        }
         this.volumes.delete(runId);
         await this.options.processRunner.run("docker", ["volume", "rm", "-f", volume], {
             input: "",
@@ -46,7 +48,9 @@ export class DockerSandboxExecutor implements SandboxExecutor {
 
     private async volumeFor(runId: string, signal: AbortSignal): Promise<string> {
         const previous = this.volumes.get(runId);
-        if (previous) return previous;
+        if (previous) {
+            return previous;
+        }
         const volume = `agent-sandbox-${runId.replace(/[^a-zA-Z0-9_.-]/g, "-").slice(0, 64)}`;
         const result = await this.options.processRunner.run("docker", ["volume", "create", volume], {
             input: "",
@@ -54,7 +58,9 @@ export class DockerSandboxExecutor implements SandboxExecutor {
             signal,
             timeoutMs: this.options.timeoutMs,
         });
-        if (result.exitCode !== 0 || result.timedOut) throw new Error("Docker sandbox workspace is unavailable");
+        if (result.exitCode !== 0 || result.timedOut) {
+            throw new Error("Docker sandbox workspace is unavailable");
+        }
         this.volumes.set(runId, volume);
         return volume;
     }
