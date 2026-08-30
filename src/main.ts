@@ -1,45 +1,62 @@
+import { fileURLToPath } from "node:url";
 import { Telegraf } from "telegraf";
+import { message } from "telegraf/filters";
 
-import { type AppConfig, loadConfig } from "./Config.js";
-import type { LoggerInterface } from "./LoggerInterface.js";
-import { MessageValidator } from "./MessageValidator.js";
-import { OpenAiLlmClient } from "./OpenAiLlmClient.js";
-import { TelegramMessageHandler } from "./TelegramMessageHandler.js";
-import { registerTelegramTextHandler, type TelegramBotInterface } from "./TelegramUpdateAdapter.js";
-import { WinstonLogger } from "./WinstonLogger.js";
+import { Agent } from "./agent/Agent.js";
+import { systemClock } from "./agent/Clock.js";
+import { loadConfig } from "./config/Config.js";
+import { OpenAICompatibleClient } from "./llm/OpenAICompatibleClient.js";
+import { DialogRunService } from "./runtime/DialogRunService.js";
+import { FileSkillCatalog } from "./skills/FileSkillCatalog.js";
+import { SQLiteDatabase } from "./storage/SQLiteDatabase.js";
+import { SQLiteDialogStorage } from "./storage/SQLiteDialogStorage.js";
+import { SQLiteMessageStorage } from "./storage/SQLiteMessageStorage.js";
+import { toTelegramMessage } from "./telegram/TelegramMessage.js";
+import { TelegramMessageHandler } from "./telegram/TelegramMessageHandler.js";
+import { DockerSandboxExecutor } from "./tools/DockerSandboxExecutor.js";
+import { ExecTool } from "./tools/ExecTool.js";
+import { LoadSkillTool } from "./tools/LoadSkillTool.js";
+import { ChildProcessRunner } from "./tools/ProcessRunner.js";
+import { ToolRegistry } from "./tools/ToolRegistry.js";
 
-export interface MainDependencies {
-    config?: AppConfig;
-    logger?: LoggerInterface;
-    bot?: TelegramBotInterface;
-    registerShutdown?: (signal: "SIGINT" | "SIGTERM", callback: () => void) => void;
-}
-
-export async function main(dependencies: MainDependencies = {}): Promise<void> {
-    const config = dependencies.config ?? loadConfig();
-    const logger = dependencies.logger ?? new WinstonLogger(config.logLevel);
-    const llm = new OpenAiLlmClient(config.llm, logger);
-    const handler = new TelegramMessageHandler(new MessageValidator(), llm, logger);
-    const bot = dependencies.bot ?? (new Telegraf(config.telegramBotToken) as unknown as TelegramBotInterface);
-    registerTelegramTextHandler(bot, handler, logger);
-    logger.info("Starting Telegram bot", {
-        provider: config.llm.provider,
-        model: config.llm.model,
+export async function main(): Promise<void> {
+    const config = loadConfig();
+    const database = new SQLiteDatabase(config.sqlitePath);
+    const skills = new FileSkillCatalog(fileURLToPath(new URL("../skills", import.meta.url)));
+    const tools = new ToolRegistry([
+        new LoadSkillTool(skills),
+        new ExecTool(
+            new DockerSandboxExecutor({
+                composeFile: fileURLToPath(new URL("../sandbox-runner/compose.yaml", import.meta.url)),
+                maxOutputBytes: 32_768,
+                processRunner: new ChildProcessRunner(),
+                timeoutMs: 30_000,
+            }),
+        ),
+    ]);
+    const agent = new Agent({
+        clock: systemClock,
+        llm: new OpenAICompatibleClient(config.llm),
+        logger: console,
+        messageStorage: new SQLiteMessageStorage(database),
+        systemPromptProvider: {
+            build: () =>
+                `Ты полезный агент. Не выдумывай результаты инструментов.\n${skills
+                    .all()
+                    .map((skill) => `- ${skill.name}: ${skill.description}`)
+                    .join("\n")}`,
+        },
+        toolRunner: tools,
+    });
+    const handler = new TelegramMessageHandler(
+        new DialogRunService({ agent, dialogStorage: new SQLiteDialogStorage(database) }),
+    );
+    const bot = new Telegraf(config.telegramBotToken);
+    bot.on(message("text"), async (context) => {
+        const incoming = toTelegramMessage(context);
+        if (incoming) await handler.handle(incoming, async (text) => await context.reply(text));
     });
     await bot.launch();
-    logger.info("Telegram polling started");
-    const registerShutdown = dependencies.registerShutdown ?? ((signal, callback) => process.once(signal, callback));
-    for (const signal of ["SIGINT", "SIGTERM"] as const) {
-        registerShutdown(signal, () => {
-            logger.info("Stopping Telegram polling", { signal });
-            bot.stop(signal);
-        });
-    }
 }
 
-if (process.argv[1]?.endsWith("main.ts") || process.argv[1]?.endsWith("main.js")) {
-    void main().catch((error) => {
-        console.error("Application startup failed:", error instanceof Error ? error.message : error);
-        process.exitCode = 1;
-    });
-}
+if (process.argv[1]?.endsWith("main.ts") || process.argv[1]?.endsWith("main.js")) void main();
