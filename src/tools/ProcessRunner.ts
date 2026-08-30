@@ -24,7 +24,9 @@ export class ChildProcessRunner implements ProcessRunner {
                 const written = chunk.subarray(0, available);
                 chunks.push(written);
                 outputBytes += written.length;
-                if (written.length < chunk.length) truncated = true;
+                if (written.length < chunk.length) {
+                    truncated = true;
+                }
             };
             const timer = setTimeout(() => {
                 timedOut = true;

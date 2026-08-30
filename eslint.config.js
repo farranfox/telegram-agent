@@ -64,6 +64,7 @@ export default tseslint.config(
             "@typescript-eslint/require-await": "warn",
             "@typescript-eslint/return-await": ["warn", "always"],
             "@typescript-eslint/await-thenable": "error",
+            curly: ["error", "all"],
             "import-x/no-extraneous-dependencies": importPluginDisabled
                 ? "off"
                 : [

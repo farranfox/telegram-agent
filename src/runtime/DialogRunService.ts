@@ -23,7 +23,9 @@ export class DialogRunService {
 
     public async run(participantId: string, text: string): Promise<DialogRunResult> {
         const controller = this.activeRuns.start(participantId);
-        if (!controller) return { type: "busy" };
+        if (!controller) {
+            return { type: "busy" };
+        }
         try {
             return await this.queue.run(participantId, async () => {
                 const dialog = await this.dependencies.dialogStorage.getOrCreateActiveDialog(participantId);

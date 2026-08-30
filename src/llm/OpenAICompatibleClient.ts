@@ -33,23 +33,30 @@ export class OpenAICompatibleClient implements LlmClient {
                 signal,
             });
         } catch (error) {
-            if (signal.aborted) throw error;
+            if (signal.aborted) {
+                throw error;
+            }
             throw new LlmError("Network request to LLM failed", true);
         }
-        if (!response.ok)
+        if (!response.ok) {
             throw new LlmError(
                 `LLM returned HTTP ${response.status}`,
                 response.status === 429 || response.status >= 500,
             );
+        }
         const payload: unknown = await response.json();
         const message = (payload as { choices?: Array<{ message?: unknown }> }).choices?.[0]?.message;
-        if (!message || typeof message !== "object") throw new LlmError("LLM response has no assistant message", false);
+        if (!message || typeof message !== "object") {
+            throw new LlmError("LLM response has no assistant message", false);
+        }
         return normalizeAssistantMessage(message as Record<string, unknown>);
     }
 }
 
 function toWireMessage(message: AgentMessage): Record<string, unknown> {
-    if (message.role === "tool") return { role: "tool", tool_call_id: message.toolCallId, content: message.content };
+    if (message.role === "tool") {
+        return { role: "tool", tool_call_id: message.toolCallId, content: message.content };
+    }
     if (message.role === "assistant" && message.toolCalls?.length) {
         return {
             role: "assistant",
