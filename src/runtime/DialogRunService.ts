@@ -1,3 +1,5 @@
+import { AgentCancelledError } from "../agent/errors/AgentCancelledError.js";
+import type { Logger } from "../logging/Logger.js";
 import type { Dialog, DialogStorage } from "../storage/DialogStorage.js";
 import { ActiveRunRegistry } from "./ActiveRunRegistry.js";
 import { ParticipantQueue } from "./ParticipantQueue.js";
@@ -6,14 +8,15 @@ export interface AgentRunner {
     run(dialogId: string, text: string, signal: AbortSignal): Promise<string>;
 }
 
-export type DialogRunResult = { type: "busy" } | { type: "cancelled" } | { type: "success"; response: string };
+export type DialogRunResult =
+    { type: "busy" } | { type: "cancelled" } | { type: "failed" } | { type: "success"; response: string };
 
 export class DialogRunService {
     private readonly activeRuns: ActiveRunRegistry;
     private readonly queue: ParticipantQueue;
 
     public constructor(
-        private readonly dependencies: { agent: AgentRunner; dialogStorage: DialogStorage },
+        private readonly dependencies: { agent: AgentRunner; dialogStorage: DialogStorage; logger?: Logger },
         queue = new ParticipantQueue(),
         activeRuns = new ActiveRunRegistry(),
     ) {
@@ -32,6 +35,16 @@ export class DialogRunService {
                 const response = await this.dependencies.agent.run(dialog.id, text, controller.signal);
                 return controller.signal.aborted ? { type: "cancelled" } : { type: "success", response };
             });
+        } catch (error) {
+            // Сбой одного прогона не должен ронять бота: наружу уходит результат, не исключение.
+            if (error instanceof AgentCancelledError || controller.signal.aborted) {
+                return { type: "cancelled" };
+            }
+            this.dependencies.logger?.error("dialog.run.failed", {
+                error: error instanceof Error ? error.message : "Unknown error",
+                participantId,
+            });
+            return { type: "failed" };
         } finally {
             this.activeRuns.finish(participantId, controller);
         }

@@ -25,6 +25,9 @@ export class TelegramMessageHandler {
         if (result.type === "busy") {
             return void (await reply("Агент сейчас занят, попробуйте после ответа."));
         }
+        if (result.type === "failed") {
+            return void (await reply("Не удалось обработать запрос: модель недоступна. Попробуйте позже."));
+        }
         if (result.type === "success") {
             await reply(result.response);
         }

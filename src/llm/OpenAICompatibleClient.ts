@@ -39,8 +39,11 @@ export class OpenAICompatibleClient implements LlmClient {
             throw new LlmError("Network request to LLM failed", true);
         }
         if (!response.ok) {
+            // Тело ответа содержит настоящую причину (неверный model/endpoint, лимит, регион).
+            // Без него в логе остаётся только код, по которому ничего не диагностируется.
+            const body = await response.text().catch(() => "");
             throw new LlmError(
-                `LLM returned HTTP ${response.status}`,
+                `LLM returned HTTP ${response.status}${body ? `: ${truncateBody(body)}` : ""}`,
                 response.status === 429 || response.status >= 500,
             );
         }
@@ -51,6 +54,11 @@ export class OpenAICompatibleClient implements LlmClient {
         }
         return normalizeAssistantMessage(message as Record<string, unknown>);
     }
+}
+
+function truncateBody(body: string): string {
+    const collapsed = body.replace(/\s+/g, " ").trim();
+    return collapsed.length > 500 ? `${collapsed.slice(0, 500)}…` : collapsed;
 }
 
 function toWireMessage(message: AgentMessage): Record<string, unknown> {

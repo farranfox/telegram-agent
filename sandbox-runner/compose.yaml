@@ -9,4 +9,16 @@ services:
         pids_limit: 64
         mem_limit: 128m
         cpus: 0.5
-        tmpfs: [/tmp:size=16M, mode=1777]
+        tmpfs:
+            - /tmp:size=16M,mode=1777
+        # Skills ходят наружу через curl, поэтому исходящий доступ в интернет остаётся.
+        # Отдельная сеть нужна, чтобы sandbox не оказался на общем bridge вместе с
+        # другими локальными контейнерами и не мог обращаться к ним по имени или IP.
+        networks: [sandbox]
+        # Docker Desktop подставляет host.docker.internal в любой сети — уводим его
+        # на loopback контейнера, чтобы skill не мог достучаться до сервисов хоста.
+        extra_hosts: ["host.docker.internal:127.0.0.1", "gateway.docker.internal:127.0.0.1"]
+
+networks:
+    sandbox:
+        driver: bridge
