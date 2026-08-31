@@ -19,6 +19,10 @@ export class DockerSandboxExecutor implements SandboxExecutor {
             "docker",
             [
                 "compose",
+                // Без этого compose пишет "Container … Creating/Created" в stderr,
+                // и служебный шум попадает в вывод команды, который читает модель.
+                "--progress",
+                "quiet",
                 "-f",
                 this.options.composeFile,
                 "run",

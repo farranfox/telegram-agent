@@ -1,9 +1,14 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 export class SQLiteDatabase {
     public readonly connection: DatabaseSync;
 
     public constructor(path: string) {
+        if (path !== ":memory:") {
+            mkdirSync(dirname(path), { recursive: true });
+        }
         this.connection = new DatabaseSync(path);
         this.connection.exec("PRAGMA foreign_keys = ON;");
         this.connection.exec("PRAGMA journal_mode = WAL;");

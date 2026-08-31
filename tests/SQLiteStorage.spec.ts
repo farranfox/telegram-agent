@@ -1,3 +1,6 @@
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { SQLiteDatabase } from "../src/storage/SQLiteDatabase.js";
@@ -5,6 +8,17 @@ import { SQLiteDialogStorage } from "../src/storage/SQLiteDialogStorage.js";
 import { SQLiteMessageStorage } from "../src/storage/SQLiteMessageStorage.js";
 
 describe("SQLite storage", () => {
+    it("creates a missing parent directory for a file database", () => {
+        const directory = mkdtempSync(join(tmpdir(), "telegram-agent-"));
+        const databasePath = join(directory, "nested", "agent.sqlite");
+        const database = new SQLiteDatabase(databasePath);
+
+        database.close();
+
+        expect(existsSync(databasePath)).toBe(true);
+        rmSync(directory, { force: true, recursive: true });
+    });
+
     it("switches the active dialog without deleting old messages", async () => {
         const database = new SQLiteDatabase(":memory:");
         const dialogs = new SQLiteDialogStorage(database);

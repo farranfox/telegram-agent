@@ -8,11 +8,13 @@ import { loadConfig } from "./config/Config.js";
 import { OpenAICompatibleClient } from "./llm/OpenAICompatibleClient.js";
 import { DialogRunService } from "./runtime/DialogRunService.js";
 import { FileSkillCatalog } from "./skills/FileSkillCatalog.js";
+import { SkillSystemPromptProvider } from "./skills/SkillSystemPromptProvider.js";
 import { SQLiteDatabase } from "./storage/SQLiteDatabase.js";
 import { SQLiteDialogStorage } from "./storage/SQLiteDialogStorage.js";
 import { SQLiteMessageStorage } from "./storage/SQLiteMessageStorage.js";
 import { toTelegramMessage } from "./telegram/TelegramMessage.js";
 import { TelegramMessageHandler } from "./telegram/TelegramMessageHandler.js";
+import { CurrentDateTimeTool } from "./tools/CurrentDateTimeTool.js";
 import { DockerSandboxExecutor } from "./tools/DockerSandboxExecutor.js";
 import { ExecTool } from "./tools/ExecTool.js";
 import { LoadSkillTool } from "./tools/LoadSkillTool.js";
@@ -25,6 +27,7 @@ export async function main(): Promise<void> {
     const skills = new FileSkillCatalog(fileURLToPath(new URL("../skills", import.meta.url)));
     const tools = new ToolRegistry([
         new LoadSkillTool(skills),
+        new CurrentDateTimeTool(() => systemClock.now()),
         new ExecTool(
             new DockerSandboxExecutor({
                 composeFile: fileURLToPath(new URL("../sandbox-runner/compose.yaml", import.meta.url)),
@@ -39,17 +42,11 @@ export async function main(): Promise<void> {
         llm: new OpenAICompatibleClient(config.llm),
         logger: console,
         messageStorage: new SQLiteMessageStorage(database),
-        systemPromptProvider: {
-            build: () =>
-                `Ты полезный агент. Не выдумывай результаты инструментов.\n${skills
-                    .all()
-                    .map((skill) => `- ${skill.name}: ${skill.description}`)
-                    .join("\n")}`,
-        },
+        systemPromptProvider: new SkillSystemPromptProvider(skills),
         toolRunner: tools,
     });
     const handler = new TelegramMessageHandler(
-        new DialogRunService({ agent, dialogStorage: new SQLiteDialogStorage(database) }),
+        new DialogRunService({ agent, dialogStorage: new SQLiteDialogStorage(database), logger: console }),
     );
     const bot = new Telegraf(config.telegramBotToken);
     bot.on(message("text"), async (context) => {
@@ -57,6 +54,14 @@ export async function main(): Promise<void> {
         if (incoming) {
             await handler.handle(incoming, async (text) => await context.reply(text));
         }
+    });
+    // Предохранитель: без него любая необработанная ошибка в обработчике обновления
+    // доходит до Telegraf, становится unhandled rejection и убивает процесс бота.
+    bot.catch((error, context) => {
+        console.error("telegram.update.failed", {
+            error: error instanceof Error ? error.message : "Unknown error",
+            updateId: context.update.update_id,
+        });
     });
     await bot.launch();
 }

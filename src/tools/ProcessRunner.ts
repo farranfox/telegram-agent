@@ -35,13 +35,23 @@ export class ChildProcessRunner implements ProcessRunner {
             const abort = (): void => {
                 child.kill("SIGTERM");
             };
+            const release = (): void => {
+                clearTimeout(timer);
+                options.signal.removeEventListener("abort", abort);
+            };
             options.signal.addEventListener("abort", abort, { once: true });
             child.stdout.on("data", append);
             child.stderr.on("data", append);
-            child.once("error", reject);
+            // Защита: ошибка записи в stdin умершего процесса не должна всплывать наружу.
+            // Node 22 гасит EPIPE на stdio ребёнка сам, но настоящая причина сбоя всё равно
+            // приходит через "error" или ненулевой exit code, поэтому стрим глушим молча.
+            child.stdin.on("error", () => undefined);
+            child.once("error", (error) => {
+                release();
+                reject(error);
+            });
             child.once("close", (exitCode) => {
-                clearTimeout(timer);
-                options.signal.removeEventListener("abort", abort);
+                release();
                 resolve({ exitCode, output: Buffer.concat(chunks).toString("utf8"), timedOut, truncated });
             });
             child.stdin.end(options.input);
